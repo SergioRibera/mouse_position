@@ -1,6 +1,6 @@
 # Mouse Position
 
-> [!INFO]
+> [!NOTE]
 > Support for all platforms
 > - Windows (winapi)
 > - MacOS (core-graphics)
