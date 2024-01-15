@@ -30,7 +30,7 @@ pub use linux::LinuxMouse as Mouse;
 #[cfg(target_os = "macos")]
 pub use macos::MacMouse as Mouse;
 #[cfg(target_os = "windows")]
-pub use windows::WinMouse;
+pub use windows::WinMouse as Mouse;
 
 pub trait MouseExt {
     fn get_pos(&self) -> Result<(i32, i32), MouseError>;
