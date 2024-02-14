@@ -33,7 +33,7 @@ impl Default for XorgMouse {
 }
 
 impl MouseExt for XorgMouse {
-    fn get_pos(&self) -> Result<(i32, i32), MouseError> {
+    fn get_pos(&mut self) -> Result<(i32, i32), MouseError> {
         // Get the pointer position
         let mut root: Window = 0;
         let mut child: Window = 0;

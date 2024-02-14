@@ -33,6 +33,6 @@ pub use macos::MacMouse as Mouse;
 pub use windows::WinMouse as Mouse;
 
 pub trait MouseExt {
-    fn get_pos(&self) -> Result<(i32, i32), MouseError>;
+    fn get_pos(&mut self) -> Result<(i32, i32), MouseError>;
     fn get_physical_pos(&self) -> Result<(i32, i32), MouseError>;
 }

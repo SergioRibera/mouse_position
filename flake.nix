@@ -46,7 +46,7 @@
               wayland
               wayland.dev
               # libinput
-              # libxkbcommon
+              libxkbcommon
               # xorg.libXcursor
               # xorg.libXrandr
               # xorg.libXi

@@ -38,7 +38,7 @@ impl Default for LinuxMouse {
 }
 
 impl MouseExt for LinuxMouse {
-    fn get_pos(&self) -> Result<(i32, i32), crate::error::MousePosition> {
+    fn get_pos(&mut self) -> Result<(i32, i32), crate::error::MousePosition> {
         self.inner.get_pos()
     }
 
