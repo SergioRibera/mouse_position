@@ -6,7 +6,7 @@ fn main() {
     loop {
         let (x, y) = match mouse.get_pos() {
             Ok((x, y)) => (x, y),
-            Err(e) => {
+            Err(_e) => {
                 // println!("{e:?}");
                 continue;
             }
