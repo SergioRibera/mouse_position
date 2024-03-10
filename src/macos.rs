@@ -12,27 +12,19 @@ unsafe impl Sync for MacMouse {}
 unsafe impl Send for MacMouse {}
 
 impl MouseExt for MacMouse {
-    fn get_pos(&self) -> Result<(i32, i32), crate::error::MousePosition> {
+    fn get_pos(&mut self) -> Result<(i32, i32), crate::error::MousePosition> {
         let event =
             CGEvent::new(CGEventSource::new(CGEventSourceStateID::CombinedSessionState).unwrap());
         match event {
             Ok(event) => {
-                let point = event.location();
-                Mouse::Position {
-                    x: point.x as i32,
-                    y: point.y as i32,
-                }
+                let point = event.map_err(|_| MouseError::NoMouseFound)?.location();
+                Ok((point.x as i32, point.y as i32))
             }
-            Err(_) => return Mouse::Error,
+            Err(_) => return Err(crate::error::MouseError::BadExtract),
         }
-
-        event.map(|e| {
-            let point = event.location();
-            (point.x as i32, point.y as i32)
-        })
     }
 
-    fn get_physical_pos(&self) -> Result<(i32, i32), crate::error::MousePosition> {
+    fn get_physical_pos(&mut self) -> Result<(i32, i32), crate::error::MousePosition> {
         Err(crate::error::MousePosition::Unimplemented)
     }
 }
