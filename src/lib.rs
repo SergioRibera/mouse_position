@@ -3,10 +3,10 @@
 //! Example Usage:
 //! ```rust no_compile
 //! use mouse_position::{Mouse, MouseExt};
-//! 
+//!
 //! fn main() {
-//!     let mouse = Mouse::default();
-//! 
+//!     let mut mouse = Mouse::default();
+//!
 //!     match mouse.get_pos() {
 //!         Ok((x, y)) => println!("x: {x}, y: {y}"),
 //!         Err(e) => println!("{e:?}"),
