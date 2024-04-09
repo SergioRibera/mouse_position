@@ -20,7 +20,7 @@ impl MouseExt for MacMouse {
                 let point = event.location();
                 Ok((point.x as i32, point.y as i32))
             }
-            Err(_) => return Err(crate::error::MousePosition::BadExtract),
+            Err(_) => Err(crate::error::MousePosition::BadExtract),
         }
     }
 

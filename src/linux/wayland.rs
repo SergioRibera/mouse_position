@@ -5,7 +5,7 @@ fn write_to_socket(path: String, content: &str) -> Result<String, crate::error::
     use std::os::unix::net::UnixStream;
     let mut stream = UnixStream::connect(path)?;
 
-    stream.write_all(&content.as_bytes())?;
+    stream.write_all(content.as_bytes())?;
 
     let mut response = vec![];
 
@@ -27,7 +27,7 @@ fn write_to_socket(path: String, content: &str) -> Result<String, crate::error::
 enum WM {
     Hyprland,
     #[allow(unused)]
-    KDE,
+    Kde,
 }
 
 impl WM {
