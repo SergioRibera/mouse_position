@@ -83,7 +83,7 @@ impl MouseExt for WaylandMouse {
         self.0.get_pos()
     }
 
-    fn get_physical_pos(&self) -> Result<(i32, i32), crate::error::MousePosition> {
+    fn get_physical_pos(&mut self) -> Result<(i32, i32), crate::error::MousePosition> {
         Err(crate::error::MousePosition::Unimplemented)
     }
 }

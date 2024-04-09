@@ -74,7 +74,7 @@ impl MouseExt for XorgMouse {
         Ok((x, y))
     }
 
-    fn get_physical_pos(&self) -> Result<(i32, i32), MouseError> {
+    fn get_physical_pos(&mut self) -> Result<(i32, i32), MouseError> {
         Err(MouseError::Unimplemented)
     }
 }

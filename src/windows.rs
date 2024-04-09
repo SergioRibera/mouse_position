@@ -23,7 +23,7 @@ impl MouseExt for WinMouse {
         Ok((point.x, point.y))
     }
 
-    fn get_physical_pos(&self) -> Result<(i32, i32), MousePosition> {
+    fn get_physical_pos(&mut self) -> Result<(i32, i32), MousePosition> {
         let mut point = POINT { x: 0, y: 0 };
         let result = unsafe { GetPhysicalCursorPos(&mut point) };
         if result != 1 {

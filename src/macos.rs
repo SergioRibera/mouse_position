@@ -17,10 +17,10 @@ impl MouseExt for MacMouse {
             CGEvent::new(CGEventSource::new(CGEventSourceStateID::CombinedSessionState).unwrap());
         match event {
             Ok(event) => {
-                let point = event.map_err(|_| MouseError::NoMouseFound)?.location();
+                let point = event.map_err(|_| crate::error::MousePosition::NoMouseFound)?.location();
                 Ok((point.x as i32, point.y as i32))
             }
-            Err(_) => return Err(crate::error::MouseError::BadExtract),
+            Err(_) => return Err(crate::error::MousePosition::BadExtract),
         }
     }
 
