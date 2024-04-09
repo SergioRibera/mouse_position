@@ -8,7 +8,7 @@ use winapi::{
 use crate::{error::MousePosition, MouseExt};
 
 #[derive(Default, Clone)]
-pub struct WinMouse;
+pub struct WinMouse {}
 
 unsafe impl Sync for WinMouse {}
 unsafe impl Send for WinMouse {}

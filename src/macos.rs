@@ -6,7 +6,7 @@ use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 use crate::MouseExt;
 
 #[derive(Default, Clone)]
-pub struct MacMouse;
+pub struct MacMouse {}
 
 unsafe impl Sync for MacMouse {}
 unsafe impl Send for MacMouse {}
