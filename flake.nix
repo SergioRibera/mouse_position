@@ -1,99 +1,81 @@
 {
-  description = "Standar cross compile flake for Rust Lang Projects";
   inputs = {
-    flake-parts.url = "github:hercules-ci/flake-parts";
-    flake-utils.url = "github:numtide/flake-utils";
-    fenix.url = "github:nix-community/fenix/monthly";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     crane.url = "github:ipetkov/crane";
+    fenix.url = "github:nix-community/fenix";
+    flake-utils.url = "github:numtide/flake-utils";
   };
-  outputs =
-    inputs @ { flake-parts
-    , fenix
-    , nixpkgs
-    , flake-utils
-    , crane
-    , self
-    , ...
-    }:
-    inputs.flake-parts.lib.mkFlake
-      {
-        inherit inputs;
+
+  outputs = {
+    nixpkgs,
+    flake-utils,
+    ...
+  } @ inputs: let
+      fenix = inputs.fenix.packages;
+    in
+    # Iterate over Arm, x86 for MacOs 🍎 and Linux 🐧
+    (flake-utils.lib.eachDefaultSystem (
+      system: let
+        pkgs = nixpkgs.legacyPackages.${system};
+        crane = inputs.crane.mkLib pkgs;
+        # Toolchain
+        toolchain = fenix.${system}.fromToolchainFile {
+          file = ./rust-toolchain.toml;
+          sha256 = "sha256-yMuSb5eQPO/bHv+Bcf/US8LVMbf/G/0MSfiPwBhiPpk=";
+        };
+        craneLib = crane.overrideToolchain toolchain;
+
+        buildInputs = with pkgs; [
+          openssl.dev
+          pkg-config
+          wayland
+        ];
+
+        src = pkgs.lib.cleanSourceWith {
+          src = craneLib.path ./.;
+          filter = path: type: (craneLib.filterCargoSources path type);
+        };
+        commonArgs = {
+          doCheck = false;
+          inherit src buildInputs;
+        };
+
+        libraries = with pkgs; [
+          libGL
+          libxkbcommon
+          wayland
+          xorg.libX11
+          xorg.libXcursor
+          xorg.libXi
+          xorg.libXrandr
+        ];
+        # Compile all artifacts
+        appDeps = craneLib.buildDepsOnly commonArgs;
+
+        # Compile
+        pkg = name: craneLib.buildPackage (commonArgs // {
+          cargoArtifacts = appDeps;
+          cargoExtraArgs = "--example ${name}";
+        });
+
+        app = name: flake-utils.lib.mkApp {
+          drv = pkg name;
+        };
+      in {
+        # nix build
+        packages.default = pkg "simple";
+
+        # nix run
+        apps.default = app "simple";
+
+        # nix develop
+        devShells.default = craneLib.devShell {
+          inherit buildInputs;
+
+          packages = [
+            toolchain
+          ] ++ libraries;
+        };
       }
-      {
-        systems = [ "x86_64-linux" ];
-        perSystem =
-          { config
-          , pkgs
-          , system
-          , ...
-          }:
-          let
-            inherit (pkgs) lib;
-            # Toolchain
-            toolchain = with fenix.packages.${system};
-              fromToolchainFile {
-                file = ./rust-toolchain.toml;
-                sha256 = "sha256-U2yfueFohJHjif7anmJB5vZbpP7G6bICH4ZsjtufRoU=";
-              };
-            craneLib = crane.lib.${system}.overrideToolchain toolchain;
-
-            src = craneLib.cleanCargoSource (craneLib.path ./.);
-            buildInputs = with pkgs; [
-              openssl.dev
-              pkg-config
-
-              wayland
-              wayland.dev
-              # libinput
-              libxkbcommon
-              # xorg.libXcursor
-              # xorg.libXrandr
-              # xorg.libXi
-              xorg.libX11
-            ];
-            commonArgs = {
-              inherit src;
-              inherit buildInputs;
-            };
-            # Compile all artifacts for x86_64-unknown-linux-gnu
-            linuxArtifacts = craneLib.buildDepsOnly (commonArgs
-              // {
-              CARGO_BUILD_TARGET = "x86_64-unknown-linux-gnu";
-              doCheck = false;
-            });
-
-            # Compile app for x86_64-unknown-linux-gnu
-            linuxApp = craneLib.buildPackage (
-              commonArgs
-              // {
-                doCheck = false;
-                cargoArtifacts = linuxArtifacts;
-              }
-            );
-          in
-          {
-            # nix build
-            packages = {
-              default = linuxApp;
-            };
-
-            # nix run
-            apps = {
-              default = flake-utils.lib.mkApp {
-                drv = linuxApp;
-              };
-            };
-
-            # nix develop
-            devShells.default = craneLib.devShell {
-              packages = with pkgs; [
-                toolchain
-                fontconfig
-                noto-fonts-color-emoji
-              ] ++ commonArgs.buildInputs;
-              LD_LIBRARY_PATH = lib.makeLibraryPath buildInputs;
-            };
-          };
-      };
+    ));
 }
