@@ -16,7 +16,7 @@
 
 pub mod error;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
@@ -25,7 +25,7 @@ mod windows;
 
 use error::MousePosition as MouseError;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 pub use linux::LinuxMouse as Mouse;
 #[cfg(target_os = "macos")]
 pub use macos::MacMouse as Mouse;
