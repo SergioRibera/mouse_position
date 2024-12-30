@@ -2,9 +2,12 @@
 
 > [!NOTE]
 > Support for all platforms
+>
 > - Windows (winapi)
 > - MacOS (core-graphics)
-> - Linux (libinput)
+> - Linux
+>   - Xorg
+>   - Wayland (is a layershell for each monitor so use with caution)
 
 A simple crate to get the mouse position in a cross platform way.
 
