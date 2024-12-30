@@ -8,7 +8,7 @@ use wayland_client::globals::registry_queue_init;
 use wayland_client::protocol::wl_compositor::WlCompositor;
 use wayland_client::protocol::wl_seat::WlSeat;
 use wayland_client::protocol::wl_shm::{Format, WlShm};
-use wayland_client::Connection;
+use wayland_client::{Connection, EventQueue};
 
 mod dispatch;
 mod state;
@@ -18,8 +18,8 @@ use crate::MouseExt;
 use state::State;
 
 pub struct WaylandMouse {
-    position: (i32, i32),
-    phys_position: (i32, i32),
+    event_queue: EventQueue<State>,
+    state: State,
 }
 
 unsafe impl Sync for WaylandMouse {}
@@ -123,20 +123,17 @@ impl Default for WaylandMouse {
 
         event_queue.blocking_dispatch(&mut state).unwrap();
 
-        Self {
-            position: state.current_pos,
-            // TODO:
-            phys_position: state.current_pos,
-        }
+        Self { event_queue, state }
     }
 }
 
 impl MouseExt for WaylandMouse {
     fn get_pos(&mut self) -> Result<(i32, i32), crate::error::MousePosition> {
-        Ok(self.position)
+        _ = self.event_queue.blocking_dispatch(&mut self.state).unwrap();
+        Ok(self.state.current_pos)
     }
 
     fn get_physical_pos(&mut self) -> Result<(i32, i32), crate::error::MousePosition> {
-        Ok(self.phys_position)
+        Err(crate::error::MousePosition::BadExtract)
     }
 }

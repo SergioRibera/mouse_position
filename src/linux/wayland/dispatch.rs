@@ -150,16 +150,6 @@ impl Dispatch<wl_output::WlOutput, ()> for state::State {
             wl_output::Event::Mode { width, height, .. } => {
                 output.size = (width, height);
             }
-            wl_output::Event::Geometry {
-                x: _,
-                y: _,
-                physical_width: _,
-                physical_height: _,
-                subpixel: _,
-                make: _,
-                model: _,
-                transform: _,
-            } => {}
             _ => (),
         }
     }
@@ -231,6 +221,7 @@ impl Dispatch<wl_pointer::WlPointer, ()> for state::State {
                 dispatch_state.current_screen = current_screen;
                 let start_x = dispatch_state.zxdg_outputs[dispatch_state.current_screen].start_x;
                 let start_y = dispatch_state.zxdg_outputs[dispatch_state.current_screen].start_y;
+
                 dispatch_state.current_pos =
                     (surface_x as i32 + start_x, surface_y as i32 + start_y);
                 wl_surface.commit();
@@ -242,6 +233,7 @@ impl Dispatch<wl_pointer::WlPointer, ()> for state::State {
             } => {
                 let start_x = dispatch_state.zxdg_outputs[dispatch_state.current_screen].start_x;
                 let start_y = dispatch_state.zxdg_outputs[dispatch_state.current_screen].start_y;
+
                 dispatch_state.current_pos =
                     (surface_x as i32 + start_x, surface_y as i32 + start_y);
             }
