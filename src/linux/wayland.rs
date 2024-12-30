@@ -1,89 +1,142 @@
+use std::os::fd::AsFd;
+
+use smithay_client_toolkit::reexports::protocols::wp::cursor_shape::v1::client::wp_cursor_shape_manager_v1::WpCursorShapeManagerV1;
+use smithay_client_toolkit::reexports::protocols::xdg::xdg_output::zv1::client::zxdg_output_manager_v1::ZxdgOutputManagerV1;
+use smithay_client_toolkit::reexports::protocols_wlr::layer_shell::v1::client::zwlr_layer_shell_v1::{Layer, ZwlrLayerShellV1};
+use smithay_client_toolkit::reexports::protocols_wlr::layer_shell::v1::client::zwlr_layer_surface_v1::{self, Anchor};
+use wayland_client::globals::registry_queue_init;
+use wayland_client::protocol::wl_compositor::WlCompositor;
+use wayland_client::protocol::wl_seat::WlSeat;
+use wayland_client::protocol::wl_shm::{Format, WlShm};
+use wayland_client::Connection;
+
+mod dispatch;
+mod state;
+
 use crate::MouseExt;
 
-fn write_to_socket(path: String, content: &str) -> Result<String, crate::error::MousePosition> {
-    use std::io::prelude::*;
-    use std::os::unix::net::UnixStream;
-    let mut stream = UnixStream::connect(path)?;
+use state::State;
 
-    stream.write_all(content.as_bytes())?;
-
-    let mut response = vec![];
-
-    const BUF_SIZE: usize = 8192;
-    let mut buf = [0; BUF_SIZE];
-    loop {
-        let num_read = stream.read(&mut buf)?;
-        let buf = &buf[..num_read];
-        response.append(&mut buf.to_vec());
-        if num_read == 0 || num_read != BUF_SIZE {
-            break;
-        }
-    }
-
-    Ok(String::from_utf8(response)?)
-}
-
-#[derive(Clone)]
-enum WM {
-    Hyprland,
-    #[allow(unused)]
-    Kde,
-}
-
-impl WM {
-    pub fn new() -> Result<Self, crate::error::MousePosition> {
-        std::env::var("HYPRLAND_INSTANCE_SIGNATURE")
-            .map(|_| WM::Hyprland)
-            .map_err(|_| crate::error::MousePosition::WMNotDetected)
-    }
-
-    pub fn socket(&self) -> Result<String, crate::error::MousePosition> {
-        match self {
-            WM::Hyprland => std::env::var("HYPRLAND_INSTANCE_SIGNATURE")
-                .map_err(|_| crate::error::MousePosition::SocketNotFound)
-                .map(|sig| format!("/tmp/hypr/{sig}/.socket.sock")),
-            _ => Err(crate::error::MousePosition::SocketNotFound),
-        }
-    }
-
-    pub fn get_pos(&self) -> Result<(i32, i32), crate::error::MousePosition> {
-        match self {
-            WM::Hyprland => {
-                let raw = write_to_socket(self.socket()?, "/cursorpos")?;
-                let pos = raw
-                    .split_once(", ")
-                    .map(|(x, y)| {
-                        (
-                            x.parse::<i32>().expect("Cannot parse X"),
-                            y.parse::<i32>().expect("Cannot parse Y"),
-                        )
-                    })
-                    .ok_or(crate::error::MousePosition::BadExtract)?;
-                Ok(pos)
-            }
-            _ => Err(crate::error::MousePosition::Unimplemented),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct WaylandMouse(WM);
-
-impl Default for WaylandMouse {
-    fn default() -> Self {
-        Self(WM::new().expect("No Wayland WM detected"))
-    }
+pub struct WaylandMouse {
+    position: (i32, i32),
+    phys_position: (i32, i32),
 }
 
 unsafe impl Sync for WaylandMouse {}
 unsafe impl Send for WaylandMouse {}
 
+impl Default for WaylandMouse {
+    fn default() -> Self {
+        let connection = Connection::connect_to_env().unwrap();
+        let (globals, _) = registry_queue_init::<State>(&connection).unwrap();
+
+        let mut event_queue = connection.new_event_queue::<State>();
+        let qh = event_queue.handle();
+
+        let mut state = State::default();
+
+        let wmcompositer = globals.bind::<WlCompositor, _, _>(&qh, 1..=5, ()).unwrap();
+
+        let cursor_manager = globals
+            .bind::<WpCursorShapeManagerV1, _, _>(&qh, 1..=1, ())
+            .ok();
+
+        let shm = globals.bind::<WlShm, _, _>(&qh, 1..=1, ()).unwrap();
+
+        state.cursor_manager = cursor_manager;
+
+        globals.bind::<WlSeat, _, _>(&qh, 1..=1, ()).unwrap();
+
+        let _ = connection.display().get_registry(&qh, ()); // so if you want WlOutput, you need to
+                                                            // register this
+
+        event_queue.blocking_dispatch(&mut state).unwrap();
+
+        let xdg_output_manager = globals
+            .bind::<ZxdgOutputManagerV1, _, _>(&qh, 1..=3, ())
+            .unwrap();
+
+        for wloutput in state.outputs.iter() {
+            let zwloutput = xdg_output_manager.get_xdg_output(wloutput.get_output(), &qh, ());
+            state
+                .zxdg_outputs
+                .push(state::ZXdgOutputInfo::new(zwloutput));
+        }
+
+        event_queue.blocking_dispatch(&mut state).unwrap();
+
+        // you will find you get the outputs, but if you do not
+        // do the step before, you get empty list
+
+        let layer_shell = globals
+            .bind::<ZwlrLayerShellV1, _, _>(&qh, 3..=4, ())
+            .unwrap();
+        let region = wmcompositer.create_region(&qh, ());
+        region.add(0, 0, 0, 0);
+
+        // so it is the same way, to get surface detach to protocol, first get the shell, like wmbase
+        // or layer_shell or session-shell, then get `surface` from the wl_surface you get before, and
+        // set it
+        // finally thing to remember is to commit the surface, make the shell to init.
+        for (index, (wloutput, zwlinfo)) in state
+            .outputs
+            .iter()
+            .zip(state.zxdg_outputs.iter())
+            .enumerate()
+        {
+            let wl_surface = wmcompositer.create_surface(&qh, ());
+            let (init_w, init_h) = (zwlinfo.width, zwlinfo.height);
+            // this example is ok for both xdg_surface and layer_shell
+
+            let layer = layer_shell.get_layer_surface(
+                &wl_surface,
+                Some(wloutput.get_output()),
+                Layer::Overlay,
+                format!("__nobody_mouse_position_{index}"),
+                &qh,
+                (),
+            );
+            layer.set_anchor(Anchor::Top | Anchor::Left | Anchor::Right | Anchor::Bottom);
+            layer.set_exclusive_zone(-1);
+            layer.set_keyboard_interactivity(zwlr_layer_surface_v1::KeyboardInteractivity::None);
+            // TODO: check why
+            // wl_surface.set_input_region(Some(&region));
+            layer.set_size(init_w as u32, init_h as u32);
+
+            wl_surface.commit(); // so during the init Configure of the shell, a buffer, atleast a buffer is needed.
+                                 // and if you need to reconfigure it, you need to commit the wl_surface again
+                                 // so because this is just an example, so we just commit it once
+                                 // like if you want to reset anchor or KeyboardInteractivity or resize, commit is needed
+
+            let file = tempfile::tempfile().unwrap();
+            file.set_len((init_w * init_h * 4) as u64).unwrap();
+            let pool = shm.create_pool(file.as_fd(), init_w * init_h * 4, &qh, ());
+            let buffer =
+                pool.create_buffer(0, init_w, init_h, init_w * 4, Format::Argb8888, &qh, ());
+
+            state.wl_surfaces.push(state::LayerSurfaceInfo {
+                layer,
+                wl_surface,
+                buffer,
+            });
+        }
+
+        event_queue.blocking_dispatch(&mut state).unwrap();
+
+        Self {
+            position: state.current_pos,
+            // TODO:
+            phys_position: state.current_pos,
+        }
+    }
+}
+
 impl MouseExt for WaylandMouse {
     fn get_pos(&mut self) -> Result<(i32, i32), crate::error::MousePosition> {
-        self.0.get_pos()
+        Ok(self.position)
     }
 
     fn get_physical_pos(&mut self) -> Result<(i32, i32), crate::error::MousePosition> {
-        Err(crate::error::MousePosition::Unimplemented)
+        Ok(self.phys_position)
     }
 }
